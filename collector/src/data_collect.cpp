@@ -35,6 +35,7 @@
 #include <fstream>
 #include <string>
 #include <limits.h>
+#include <cstdlib>
 
 std::string category = "no input";
 std::string ROOT_PATH;
@@ -383,11 +384,24 @@ int main(int argc, char** argv){
   category = argv[1];
   std::cout << "category is " << category << std::endl;
 
+  system("mkdir -p /home/wanlin/agitr/dddd");
+
   // Get work directory
   std::string full_path = getexepath();
   std::string ws_name = "ADL_dataset_ws";
   ROOT_PATH = full_path.substr(0, full_path.find(ws_name)
                                   + ws_name.length() + 1);
+  // Make dir
+  std::stringstream dir_cropped_img, dir_full_img, dir_pose, dir_segmented_pcd;
+  dir_cropped_img << "mkdir -p " << ROOT_PATH << "data/cropped_img";
+  dir_full_img << "mkdir -p " << ROOT_PATH << "data/full_img";
+  dir_pose << "mkdir -p " << ROOT_PATH << "data/pose";
+  dir_segmented_pcd << "mkdir -p " << ROOT_PATH << "data/segmented_pcd";
+
+  system(dir_cropped_img.str().c_str());
+  system(dir_full_img.str().c_str());
+  system(dir_pose.str().c_str());
+  system(dir_segmented_pcd.str().c_str());
 
   // Initialize ROS
   ros::init(argc, argv, "pcl_cv_datasb");
