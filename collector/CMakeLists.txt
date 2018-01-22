@@ -39,6 +39,14 @@ target_link_libraries(data_collect
   ${OpenCV_LIBS}
 )
 
+add_executable(data_color src/data_color.cpp)
+target_link_libraries(data_color
+  ${catkin_LIBRARIES}
+  ${PCL_COMMON_LIBRARIES}
+  ${OpenCV_LIBS}
+)
+
+
 add_executable(ellipse_test src/ellipse_test.cpp)
 target_link_libraries(ellipse_test
   ${catkin_LIBRARIES}
