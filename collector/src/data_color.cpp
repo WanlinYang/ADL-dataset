@@ -34,8 +34,12 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <string>
+#include <limits.h>
+#include <cstdlib>
 
-std::string category = "pen_3_3";
+std::string category = "no input";
+std::string ROOT_PATH;
 
 typedef enum{IDLE, RECORD_BACK, MASK_VIEW, CROP, POSE} Mode_t;
 static Mode_t Mode = IDLE;
@@ -56,17 +60,35 @@ cv::Mat depth;
 cv::Mat depth_crop;
 cv::Rect boundRect;
 int keyboard;
-const int SEMI_MINOR = 71;  // y-axis
-const int SEMI_MAJOR = 89;   // x-axis
-const int THRESHOLD_MAX = 100;
-int threshold = 30;
+
+bool verbose = true;
+bool said = false;
+
+const int SEMI_MINOR = 72;  // y-axis
+const int SEMI_MAJOR = 88;   // x-axis
+const int THRESHOLD_MAX = 100; // trackbar range
+int threshold = 30; // dafault value, could be adjusted by trackbar
+
 void subtractBackground();
 
 void manuallyboundRect(){
+/*
+For some white objects such as pill bottle,
+denoting the bounding box by hand seems better
+*/
   boundRect.x = 295;
   boundRect.y = 180;
   boundRect.width = 50;
   boundRect.height = 70;
+}
+
+std::string getexepath(){
+/*
+Get the path
+*/
+  char result[PATH_MAX];
+  ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+  return std::string(result, (count > 0) ? count : 0);
 }
 
 void cloud_cb(const sensor_msgs::PointCloud2ConstPtr& input){
@@ -82,9 +104,9 @@ void cloud_cb(const sensor_msgs::PointCloud2ConstPtr& input){
   pass.setFilterFieldName ("z");
   pass.setFilterLimits (0.0, 1.3);
   pass.setFilterFieldName ("y");
-  pass.setFilterLimits (-0.2, 1.0);
-  pass.setFilterFieldName ("x");
-  pass.setFilterLimits (-0.15,0.15);
+  pass.setFilterLimits (-0.3, 1.0);
+  //pass.setFilterFieldName ("x");
+  //pass.setFilterLimits (-0.2, 0.2);
   //pass.setFilterLimitsNegative (true);
   pass.filter (*cloud_passthrough);
 
@@ -172,9 +194,8 @@ void cloud_cb(const sensor_msgs::PointCloud2ConstPtr& input){
 
     if(Mode == CROP){
       std::stringstream ss_pcd, ss_pcdcrop;
-      //ss_pcd <<"/home/wanlin/agitr/pcl_cv_ws/full_pcd/" << category <<"_"<< output_count <<"_"<< "pcloriginal.pcd";
-      ss_pcdcrop <<"/home/wanlin/agitr/pcl_cv_ws/data/segmented_pcd/" <<  category <<"_"<< output_count << ".pcd";
-      //pcl::io::savePCDFileASCII (ss_pcd.str(), *cloud);
+      ss_pcdcrop << ROOT_PATH << "data/segmented_pcd/"
+                 << category <<"_"<< output_count << ".pcd";
       pcl::io::savePCDFile (ss_pcdcrop.str(), output, true);  // save as binary
     }
     pub.publish(output);
@@ -199,18 +220,29 @@ void image_cb(const sensor_msgs::ImageConstPtr& input){
     case IDLE:
       // do nothing
       {
-        cv::ellipse(frame, cv::Point(frame.cols/2,frame.rows/2),cv::Size(SEMI_MAJOR,SEMI_MINOR),0,0,360,
-          cv::Scalar(0,0,255),1,8);
+        cv::ellipse(frame, cv::Point(frame.cols/2,frame.rows/2),
+                    cv::Size(SEMI_MAJOR,SEMI_MINOR),0,0,360,
+                    cv::Scalar(0,0,255),1,8);
         cv::imshow("frame", frame);
+        if (verbose && !said){
+          std::cout << "Press b to record background imgae" << std::endl;
+          said = true;
+        }
       }
       break;
 
     case RECORD_BACK:
       // record background
-      {background = frame;
-      std::stringstream ss_background;
-      ss_background <<"/home/wanlin/agitr/pcl_cv_ws/data/"<< category<<"_"<<"background.png";
-      cv::imwrite(ss_background.str(), background);
+      {
+        background = frame;
+        std::stringstream ss_background;
+        ss_background << ROOT_PATH << "data/"<< category<<"_"<<"background.png";
+        cv::imwrite(ss_background.str(), background);
+        if (verbose && !said){
+          std::cout << "Background image is recoreded" << std::endl;
+          std::cout << "Press m to view mask" << std::endl;
+          said = true;
+        }
       }
       break;
 
@@ -225,6 +257,11 @@ void image_cb(const sensor_msgs::ImageConstPtr& input){
         cv::rectangle(frame, boundRect, cv::Scalar(0,255,100),2,8,0);
         cv::imshow("frame", frame);
         cv::imshow("mask", mask_overlay);
+        if (verbose && !said){
+          std::cout << "Slide to adjust threshold" << std::endl;
+          std::cout << "Press c to record" << std::endl;
+          said = true;
+        }
       }
       break;
 
@@ -242,10 +279,14 @@ void image_cb(const sensor_msgs::ImageConstPtr& input){
         int y_2 = boundRect.y + boundRect.height;
 
         std::stringstream ss_frame, ss_framecrop, ss_maskcrop, ss_loc;
-        ss_frame <<"/home/wanlin/agitr/pcl_cv_ws/data/full_img/" << category <<"_"<< output_count <<"_"<< "rgboriginal.png";
-        ss_framecrop <<"/home/wanlin/agitr/pcl_cv_ws/data/cropped_img/"<< category <<"_"<< output_count <<"_"<< "rgbcrop.png";
-        ss_maskcrop <<"/home/wanlin/agitr/pcl_cv_ws/data/cropped_img/"<< category <<"_"<< output_count <<"_"<< "maskcrop.png";
-        ss_loc <<"/home/wanlin/agitr/pcl_cv_ws/data/cropped_img/" <<category <<"_"<< output_count <<"_"<< "loc.txt";
+        ss_frame << ROOT_PATH << "data/full_img/" << category
+                 <<"_"<< output_count <<"_"<< "rgboriginal.png";
+        ss_framecrop << ROOT_PATH << "data/cropped_img/"<< category
+                     <<"_"<< output_count <<"_"<< "rgbcrop.png";
+        ss_maskcrop << ROOT_PATH << "data/cropped_img/" << category
+                    <<"_"<< output_count <<"_"<< "maskcrop.png";
+        ss_loc << ROOT_PATH << "data/cropped_img/" << category
+               <<"_"<< output_count <<"_"<< "loc.txt";
 
         cv::imshow("frame_crop", frame_crop);
 
@@ -263,21 +304,26 @@ void image_cb(const sensor_msgs::ImageConstPtr& input){
         cv::rectangle(frame, boundRect, cv::Scalar(0,255,100),2,8,0);
         cv::imshow("frame", frame);
         cv::imshow("mask", mask_overlay);
+        if (verbose){
+          std::cout << "Recording #" << output_count << std::endl;
+          std::cout << "Press p to stop" << std::endl;
+        }
       }
       break;
 
     case POSE:
       {
         float angle_step = 360.0/(output_count-1);
-        std::cout << angle_step << std::endl;
         for(int i=0; i<output_count; i++){
           std::stringstream ss_pose;
-          ss_pose <<"/home/wanlin/agitr/pcl_cv_ws/data/pose/"<< category <<"_"<< i <<"_"<<"pose.txt";
+          ss_pose << ROOT_PATH << "data/pose/" << category
+                  <<"_"<< i <<"_"<<"pose.txt";
           std::ofstream posefile;
           posefile.open(ss_pose.str().c_str());
           posefile << i*angle_step << "\n";
           posefile.close();
         }
+        std::cout << "Positions are saved" << std::endl;
         Mode = IDLE;
       }
       break;
@@ -303,8 +349,10 @@ void depth_cb(const sensor_msgs::ImageConstPtr& input){
   depth_crop = depth(boundRect);
   if(Mode == CROP){
     std::stringstream ss_depth, ss_depthcrop;
-    ss_depth <<"/home/wanlin/agitr/pcl_cv_ws/data/full_img/" << category <<"_"<< output_count <<"_"<< "depthoriginal.png";
-    ss_depthcrop <<"/home/wanlin/agitr/pcl_cv_ws/data/cropped_img/"<< category <<"_"<< output_count <<"_"<< "depthcrop.png";
+    ss_depth << ROOT_PATH << "data/full_img/" << category
+             <<"_"<< output_count <<"_"<< "depthoriginal.png";
+    ss_depthcrop << ROOT_PATH << "data/cropped_img/" << category
+                 <<"_"<< output_count <<"_"<< "depthcrop.png";
     cv::imwrite(ss_depth.str(), depth);
     cv::imwrite(ss_depthcrop.str(), depth_crop);
     output_count ++;
@@ -312,19 +360,45 @@ void depth_cb(const sensor_msgs::ImageConstPtr& input){
 
   if((char)keyboard == 'b'){
     Mode = RECORD_BACK;
+    said = false;
   }else if((char)keyboard == 'm'){
     Mode = MASK_VIEW;
+    said = false;
   }else if((char)keyboard == 'c'){
     Mode = CROP;
+    said = false;
   }else if((char)keyboard == 'p'){
     Mode = POSE;
+    said = false;
   }else if((char)keyboard == 'q'){
     Mode = IDLE;
+    said = false;
   }
 }
 
 
 int main(int argc, char** argv){
+  category = argv[1];
+  std::cout << "category is " << category << std::endl;
+
+  system("mkdir -p /home/wanlin/agitr/dddd");
+
+  // Get work directory
+  std::string full_path = getexepath();
+  std::string ws_name = "ADL_dataset_ws";
+  ROOT_PATH = full_path.substr(0, full_path.find(ws_name)
+                                  + ws_name.length() + 1);
+  // Make dir
+  std::stringstream dir_cropped_img, dir_full_img, dir_pose, dir_segmented_pcd;
+  dir_cropped_img << "mkdir -p " << ROOT_PATH << "data/cropped_img";
+  dir_full_img << "mkdir -p " << ROOT_PATH << "data/full_img";
+  dir_pose << "mkdir -p " << ROOT_PATH << "data/pose";
+  dir_segmented_pcd << "mkdir -p " << ROOT_PATH << "data/segmented_pcd";
+
+  system(dir_cropped_img.str().c_str());
+  system(dir_full_img.str().c_str());
+  system(dir_pose.str().c_str());
+  system(dir_segmented_pcd.str().c_str());
 
   // Initialize ROS
   ros::init(argc, argv, "pcl_cv_datasb");
@@ -351,8 +425,8 @@ void subtractBackground(){
   mask = cv::Mat::zeros(object.rows, object.cols, CV_8UC1);
   mask_ellipse = cv::Mat::zeros(object.rows, object.cols, CV_8UC1);
   mask_overlay = cv::Mat::zeros(object.rows, object.cols, CV_8UC1);
-  cv::ellipse(mask_ellipse, cv::Point(object.cols/2,object.rows/2),cv::Size(SEMI_MAJOR,SEMI_MINOR),
-      0,0,360,cv::Scalar(255,255,255),-1,8);
+  cv::ellipse(mask_ellipse, cv::Point(object.cols/2,object.rows/2),
+              cv::Size(SEMI_MAJOR,SEMI_MINOR),0,0,360,cv::Scalar(255,255,255),-1,8);
 
   float dist;
   for(int i=0; i<object.rows; i++){
@@ -366,7 +440,8 @@ void subtractBackground(){
     }
   }
   // erode and blur the mask
-  cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2,2), cv::Point(-1,-1));
+  cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT,
+                                              cv::Size(2,2), cv::Point(-1,-1));
   cv::erode(mask, mask_blur, element);
   cv::blur(mask_blur, mask_blur, cv::Size(10,10),cv::Point(-1,-1));
   // overlay mask_ellipse
@@ -374,7 +449,8 @@ void subtractBackground(){
   // find contours
   std::vector<std::vector<cv::Point> > contours;
   std::vector<cv::Vec4i> hierarchy;
-  cv::findContours(mask_overlay, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, cv::Point(0,0));
+  cv::findContours(mask_overlay, contours, hierarchy, CV_RETR_EXTERNAL,
+                   CV_CHAIN_APPROX_SIMPLE, cv::Point(0,0));
   // find the biggest contour
   int max_area = 0;
   int max_contour_index = 0;
