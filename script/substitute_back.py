@@ -13,9 +13,11 @@ import pickle
 image_names = {}
 # {'image_id': 'image_file_name'}
 
+test_data = False
 verbose = True
 
 CAPACITY = 14
+# object capacity of one background image
 
 class Object:
     def __init__(self, annotation, rgbdatadir):
@@ -200,6 +202,8 @@ def output_data(obj_datadir, bg_datadir, output_dir, total):
     bg_img_folder = bg_datadir
 
     output_img_dir = output_dir + '/ADL_train'
+    if test_data:
+        output_img_dir = output_dir + '/ADL_test'
     output_json_dir = output_dir + '/annotations'
     if not os.path.exists(output_img_dir):
         os.makedirs(output_img_dir)
@@ -226,7 +230,23 @@ def output_data(obj_datadir, bg_datadir, output_dir, total):
     load_image_names(obj_json_data['images'])
     obj_annotations = obj_json_data['annotations']
 
+    def prone_test_id_cands(output_dir):
+        """ assume already has training data """
+        train_json_path = output_dir + \
+                '/annotations/cluster_train2018.json'
+        with open(train_json_path, 'r') as f:
+            train_data = json.load(f)
+        num_imgs = 0
+        for img in train_data['images']:
+            num_imgs += 1
+            train_id = img['id']
+            image_id_cands.remove(train_id)
+        return num_imgs
+
     image_id_cands = [i for i in xrange(total+1000)]
+    start_id = 0
+    if test_data:
+        start_id = prone_test_id_cands(output_dir)
     data = {}
     data['images'] = []
     data['annotations'] = []
@@ -235,7 +255,7 @@ def output_data(obj_datadir, bg_datadir, output_dir, total):
     if verbose:
         print('producing and saving cluster images ...')
 
-    for total_i in xrange(total):
+    for total_i in xrange(start_id, start_id + total):
         image_id = random.choice(image_id_cands)
         image_id_cands.remove(image_id)
 
@@ -273,6 +293,8 @@ def output_data(obj_datadir, bg_datadir, output_dir, total):
         print('saving cluster json file ...')
 
     output_json_path = output_json_dir + '/cluster_train2018.json'
+    if test_data:
+        output_json_path = output_json_dir + '/cluster_test2018.json'
     with open(output_json_path, 'w') as f:
         json.dump(data, f)
 
@@ -285,6 +307,7 @@ if __name__ == '__main__':
     bg_datadir = '/home/wanlin/Pictures/scene_substitution/scene'
     output_dir = '/home/wanlin/Pictures/scene_substitution/output'
 
+    test_data = True
     data = output_data(obj_datadir, bg_datadir, output_dir, 10)
 
 #    from IPython import embed

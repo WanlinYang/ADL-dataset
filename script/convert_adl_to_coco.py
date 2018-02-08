@@ -52,7 +52,10 @@ image_ids = {}
 image_annotations = {}
 # {'ADL_file_name': Annotation}
 
+id_list = [i for i in xrange(30000)]
+
 verbose = True
+test_data = False
 
 class Annotation:
     def __init__(self, category_id, image_id):
@@ -142,7 +145,7 @@ def get_data(datadir):
     """
     go through crop location and mask files
     """
-    id_list = [i for i in xrange(30000)]
+    global id_list
 
     if verbose:
         print('getting crop locations ...')
@@ -154,27 +157,30 @@ def get_data(datadir):
                 split_filepath = re.split('_|/', filepath)
                 num_frame = int(split_filepath[-2])
                 cat = split_filepath[-5]
-                if (num_frame % 100 != 0) or \
-                   (cat not in category_ids):
-                    continue
 
-                croploc = [None]*4
-                with open(filepath) as f:
-                    loc = f.readlines()
-                    croploc[0:2] = re.split(',|\n', loc[0])[0:2]
-                    croploc[2:4] = re.split(',|\n', loc[1])[0:2]
-                    croploc = [int(i) for i in croploc]
-                frame_name = split_filepath[-5] + '_' \
-                        + split_filepath[-4] + '_' \
-                        + split_filepath[-3] + '_' \
-                        + split_filepath[-2]
+                if ((not test_data) and (num_frame % 100 == 0) and \
+                    (cat in category_ids)) or \
+                   ((test_data) and ((num_frame+10) % 47 == 0) and \
+                    (cat in category_ids)):
 
-                img_id = random.choice(id_list)
-                id_list.remove(img_id)
-                image_ids[frame_name] = img_id
-                image_annotations[frame_name] = Annotation(category_ids[cat],
-                                                          img_id)
-                image_annotations[frame_name].bbox = croploc_to_bbox(croploc)
+                    croploc = [None]*4
+                    with open(filepath) as f:
+                        loc = f.readlines()
+                        croploc[0:2] = re.split(',|\n', loc[0])[0:2]
+                        croploc[2:4] = re.split(',|\n', loc[1])[0:2]
+                        croploc = [int(i) for i in croploc]
+                    frame_name = split_filepath[-5] + '_' \
+                            + split_filepath[-4] + '_' \
+                            + split_filepath[-3] + '_' \
+                            + split_filepath[-2]
+
+                    img_id = random.choice(id_list)
+                    id_list.remove(img_id)
+                    image_ids[frame_name] = img_id
+                    image_annotations[frame_name] = \
+                            Annotation(category_ids[cat], img_id)
+                    image_annotations[frame_name].bbox = \
+                            croploc_to_bbox(croploc)
 
     if verbose:
         print('going through cropped masks ...')
@@ -204,11 +210,27 @@ def get_data(datadir):
                 area = mask_util.area(Rs)[0]
                 image_annotations[frame_name].area = area
 
+def prone_test_id_list(outputdir):
+    """
+    test image_id should not conflict with trained ids
+    """
+    global id_list
+    train_json_path = outputdir + \
+            '/annotations/segmentation_train2018.json'
+    with open(train_json_path, 'r') as f:
+        train_data = json.load(f)
+    for img in train_data['images']:
+        train_id = img['id']
+        id_list.remove(train_id)
+
 def save_data(datadir, outputdir):
     """
-    copy corresponding RGB image and ouput json file
+    copy corresponding RGB image and ouput json file for training
     """
     rgbdest_path = outputdir + '/ADL_train'
+    if test_data:
+        rgbdest_path = outputdir + '/ADL_test'
+
     if not os.path.exists(rgbdest_path):
         os.makedirs(rgbdest_path)
 
@@ -257,6 +279,8 @@ def save_data(datadir, outputdir):
         data['annotations'].append(data_annotation)
 
     json_name = 'segmentation_train2018.json'
+    if test_data:
+        json_name = 'segmentation_test2018.json'
     jsondest_path = outputdir + '/annotations'
     if not os.path.exists(jsondest_path):
         os.makedirs(jsondest_path)
@@ -273,6 +297,10 @@ if __name__ == '__main__':
     datadir = '/home/wanlin/Downloads/ADL/ADL_mask'
     rgbdir = '/home/wanlin/Downloads/ADL/ADL_rgb'
     outputdir = '/home/wanlin/Downloads/ADL/ADL2018'
+
+    test_data = True
+    if test_data:
+        prone_test_id_list(outputdir)
 
     get_data(datadir)
     data = save_data(rgbdir, outputdir)
