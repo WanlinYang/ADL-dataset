@@ -158,9 +158,9 @@ def get_data(datadir):
                 num_frame = int(split_filepath[-2])
                 cat = split_filepath[-5]
 
-                if ((not test_data) and (num_frame % 100 == 0) and \
+                if ((not test_data) and (num_frame % 15 == 0) and \
                     (cat in category_ids)) or \
-                   ((test_data) and ((num_frame+10) % 47 == 0) and \
+                   ((test_data) and ((num_frame+10) % 123 == 0) and \
                     (cat in category_ids)):
 
                     croploc = [None]*4
@@ -294,9 +294,9 @@ def save_data(datadir, outputdir):
 if __name__ == '__main__':
     get_category_id()
 
-    datadir = '/home/wanlin/Downloads/ADL/ADL_mask'
-    rgbdir = '/home/wanlin/Downloads/ADL/ADL_rgb'
-    outputdir = '/home/wanlin/Downloads/ADL/ADL2018'
+    datadir = '/home/wanlin/Downloads/ADL_mask'
+    rgbdir = '/home/wanlin/Downloads/ADL_rgb'
+    outputdir = '/home/wanlin/Downloads/ADL2018'
 
     test_data = True
     if test_data:

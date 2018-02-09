@@ -98,7 +98,7 @@ def label_img(datadir, scale_range):
 
     def nothing(x):
         pass
-    cv2.createTrackbar('pen_size', 'image', 5, 20, nothing)
+    cv2.createTrackbar('pen_size', 'image', 5, 50, nothing)
     cv2.createTrackbar('eraser_size', 'image', 5, 20, nothing)
 
     while True:
@@ -132,8 +132,8 @@ def label_img(datadir, scale_range):
             break
 
 if __name__ == '__main__':
-    datadir = '/home/wanlin/Pictures/scene_substitution/scene/Scene2.jpg'
-    #label_img(datadir, [0.6, 1.0])
+    datadir = '/home/wanlin/Downloads/ADL_cluster/scene/Scene11.jpg'
+    label_img(datadir, [0.7, 1.0])
 
 #    from IPython import embed
 #    embed()

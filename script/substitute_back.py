@@ -16,7 +16,7 @@ image_names = {}
 test_data = False
 verbose = True
 
-CAPACITY = 14
+CAPACITY = 12
 # object capacity of one background image
 
 class Object:
@@ -57,9 +57,13 @@ class Background:
         self.img_path = bgdatadir + '/' + self.bgname + '.jpg'
         self.mask_path = bgdatadir + '/' + self.bgname + '.pkl'
         self.img = cv2.imread(self.img_path)
-        self.mask = annotation['mask']
         self.scale_range = annotation['scale_range']
         self.coord_range = annotation['coord_range']
+
+    def load_data(self):
+        with open(self.mask_path, 'rb') as f:
+            d = pickle.load(f)
+        self.mask = d['mask']
 
 def find_polygon(maskcrop, bbox):
     """
@@ -145,7 +149,7 @@ def put_objects(obj_list, bg):
         [x, y] = [-1, -1]
         scale = 0
 
-        for i in xrange(5):
+        for i in xrange(10):
             scale_cand = random.uniform(bg_scale_range[0], bg_scale_range[1])
             x_cand = random.randint(x_min, x_max)
             y_cand = random.randint(y_min, y_max)
@@ -169,11 +173,14 @@ def put_objects(obj_list, bg):
                         bg_img[y+i][x+j] = obj_scaled_img[i][j]
 
             annot_dict = {}
-            annot_dict['area'] = obj.area * float(scale**2)
             annot_dict['bbox'] = [x, y, cols, rows]
             annot_dict['category_id'] = obj.category_id
-            annot_dict['segmentation'] = find_polygon(obj_scaled_mask,
+            polygon = find_polygon(obj_scaled_mask,
                                                      annot_dict['bbox'])
+            annot_dict['segmentation'] = polygon
+            Rs = mask_util.frPyObjects(polygon, 480, 640)
+            area = mask_util.area(Rs)[0]
+            annot_dict['area'] = float(area)
             annotations.append(annot_dict)
 
     return bg_img, annotations
@@ -243,7 +250,7 @@ def output_data(obj_datadir, bg_datadir, output_dir, total):
             image_id_cands.remove(train_id)
         return num_imgs
 
-    image_id_cands = [i for i in xrange(total+1000)]
+    image_id_cands = [i for i in xrange(7000)]
     start_id = 0
     if test_data:
         start_id = prone_test_id_cands(output_dir)
@@ -258,17 +265,11 @@ def output_data(obj_datadir, bg_datadir, output_dir, total):
     for total_i in xrange(start_id, start_id + total):
         image_id = random.choice(image_id_cands)
         image_id_cands.remove(image_id)
-
         image_name = 'ADL2018_cluster_' + str(total_i) + '.png'
-        image = {}
-        image['id'] = image_id
-        image['height'] = 480
-        image['width'] = 640
-        image['file_name'] = image_name
-        data['images'].append(image)
 
         bg_annotation = random.choice(bg_annotations)
         bg = Background(bg_annotation, bg_img_folder)
+        bg.load_data()
 
         num_objs = random.randint(3, CAPACITY)
         obj_list = []
@@ -280,8 +281,17 @@ def output_data(obj_datadir, bg_datadir, output_dir, total):
             obj_list.append(obj)
 
         img, annotations = put_objects(obj_list, bg)
+        if not annotations:
+            continue
         img_file_path = output_img_dir + '/' + image_name
         cv2.imwrite(img_file_path, img)
+
+        image = {}
+        image['id'] = image_id
+        image['height'] = 480
+        image['width'] = 640
+        image['file_name'] = image_name
+        data['images'].append(image)
 
         for annot in annotations:
             annot['image_id'] = image_id
@@ -303,12 +313,12 @@ def output_data(obj_datadir, bg_datadir, output_dir, total):
 
 if __name__ == '__main__':
 
-    obj_datadir = '/home/wanlin/Pictures/scene_substitution/ADL2018'
-    bg_datadir = '/home/wanlin/Pictures/scene_substitution/scene'
-    output_dir = '/home/wanlin/Pictures/scene_substitution/output'
+    obj_datadir = '/home/wanlin/Downloads/ADL2018'
+    bg_datadir = '/home/wanlin/Downloads/ADL_cluster/scene'
+    output_dir = '/home/wanlin/Downloads/ADL_cluster'
 
     test_data = True
-    data = output_data(obj_datadir, bg_datadir, output_dir, 10)
+    data = output_data(obj_datadir, bg_datadir, output_dir, 1000)
 
 #    from IPython import embed
 #    embed()
