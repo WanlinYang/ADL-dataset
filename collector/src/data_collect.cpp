@@ -441,6 +441,7 @@ void subtractBackground(){
       if(dist > threshold)
         mask.at<unsigned char>(i,j) = 255;
       // remove shadow, assume BGR sequence
+      // averge of shadow is R:26.5528 G:29.6117 B:29.7687
       if(pix[0]>=28 && pix[0]<=31 &&
           pix[1]>=28 && pix[1]<=31 &&
           pix[2]>=25 && pix[2]<=28)
