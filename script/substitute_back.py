@@ -14,7 +14,7 @@ import pickle
 This is the attempt of putting several objects that masked
 out from the original dataset over several pre-labeled
 candidate background
-
+output: 480x640 image and COCO-format json file
 """
 image_names = {}
 # {'image_id': 'image_file_name'}
