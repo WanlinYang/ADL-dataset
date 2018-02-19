@@ -6,6 +6,12 @@ import os
 import pickle
 import json
 
+"""
+User can label the acceptable range in a background
+using this script. It will output a pickle file containing
+mask of the background image.
+"""
+
 COLOR_LIB = [[250, 222, 200], [205, 0, 0],
             [34, 139, 34], [128, 192, 192],
             [42, 42, 165], [128, 64, 128],

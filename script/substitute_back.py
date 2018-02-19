@@ -10,6 +10,12 @@ import random
 import json
 import pickle
 
+"""
+This is the attempt of putting several objects that masked
+out from the original dataset over several pre-labeled
+candidate background
+
+"""
 image_names = {}
 # {'image_id': 'image_file_name'}
 
