@@ -9,6 +9,8 @@ import os
 import re
 import random
 
+from substitute_single import Object_mask, get_background, \
+                                substitute_background
 from shutil import copyfile
 import json
 
@@ -51,6 +53,9 @@ image_ids = {}
 
 image_annotations = {}
 # {'ADL_file_name': Annotation}
+
+masks = {}
+# {'frame_name', 'Object_mask'}
 
 id_list = [i for i in xrange(30000)]
 
@@ -160,8 +165,18 @@ def get_data(datadir):
 
                 if ((not test_data) and (num_frame % 15 == 0) and \
                     (cat in category_ids)) or \
-                   ((test_data) and ((num_frame+10) % 123 == 0) and \
+                   ((test_data) and ((num_frame+10) % 97 == 0) and \
                     (cat in category_ids)):
+
+                    frame_name = split_filepath[-5] + '_' \
+                            + split_filepath[-4] + '_' \
+                            + split_filepath[-3] + '_' \
+                            + split_filepath[-2]
+
+                    # for substitution
+                    obj_mask = Object_mask(filepath)
+                    obj_mask.load_location()
+                    masks[obj_mask.frame_name] = obj_mask
 
                     croploc = [None]*4
                     with open(filepath) as f:
@@ -169,10 +184,6 @@ def get_data(datadir):
                         croploc[0:2] = re.split(',|\n', loc[0])[0:2]
                         croploc[2:4] = re.split(',|\n', loc[1])[0:2]
                         croploc = [int(i) for i in croploc]
-                    frame_name = split_filepath[-5] + '_' \
-                            + split_filepath[-4] + '_' \
-                            + split_filepath[-3] + '_' \
-                            + split_filepath[-2]
 
                     img_id = random.choice(id_list)
                     id_list.remove(img_id)
@@ -196,6 +207,9 @@ def get_data(datadir):
                         + split_filepath[-2]
                 if frame_name not in image_annotations:
                     continue
+
+                # for substitution
+                masks[frame_name].load_mask(filepath)
 
                 bbox = image_annotations[frame_name].bbox
                 maskcrop = cv2.imread(filepath, cv2.IMREAD_GRAYSCALE)
@@ -223,13 +237,15 @@ def prone_test_id_list(outputdir):
         train_id = img['id']
         id_list.remove(train_id)
 
-def save_data(datadir, outputdir):
+def save_data(bg_datadir, datadir, outputdir):
     """
     copy corresponding RGB image and ouput json file for training
     """
     rgbdest_path = outputdir + '/ADL_train'
     if test_data:
         rgbdest_path = outputdir + '/ADL_test'
+
+    backgrounds = get_background(bg_datadir)
 
     if not os.path.exists(rgbdest_path):
         os.makedirs(rgbdest_path)
@@ -248,9 +264,28 @@ def save_data(datadir, outputdir):
                         + split_filepath[-2]
                 if frame_name not in image_annotations:
                     continue
+
                 destfilename = filepath.split('/')[-1]
                 destfilepath = rgbdest_path + '/' + destfilename
-                copyfile(filepath, destfilepath)
+                num_frame = int(split_filepath[-2])
+
+                if num_frame % 2 != 0:
+                    # substitution
+                    full_img = cv2.imread(filepath)
+                    obj_mask = masks[frame_name]
+                    angle_type = int(split_filepath[-3])
+                    if angle_type == 1:
+                        output_img = backgrounds['30deg'].copy()
+                    elif angle_type == 2:
+                        output_img = backgrounds['45deg'].copy()
+                    elif angle_type == 3:
+                        output_img = backgrounds['60deg'].copy()
+                    substitute_background(obj_mask, full_img, output_img)
+                    cv2.imwrite(destfilepath, output_img)
+                    continue
+                else:
+                    # no substitution
+                    copyfile(filepath, destfilepath)
 
     if verbose:
         print('saving json file ...')
@@ -295,7 +330,9 @@ if __name__ == '__main__':
     get_category_id()
 
     datadir = '/home/wanlin/Downloads/ADL_mask'
+    bg_datadir = '/home/wanlin/Pictures/background'
     rgbdir = '/home/wanlin/Downloads/ADL_rgb'
+
     outputdir = '/home/wanlin/Downloads/ADL2018'
 
     test_data = True
@@ -303,7 +340,7 @@ if __name__ == '__main__':
         prone_test_id_list(outputdir)
 
     get_data(datadir)
-    data = save_data(rgbdir, outputdir)
+    data = save_data(bg_datadir, rgbdir, outputdir)
 
 #    for key, value in image_annotations.iteritems():
 #        print(value)

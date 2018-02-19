@@ -17,6 +17,8 @@ output: only full-rgb images
 masks = {}
 # {'frame_name': }
 
+verbose = True
+
 class Object_mask:
     def __init__(self, datadir):
         self.locpath = datadir
@@ -35,23 +37,25 @@ class Object_mask:
             self.croploc = [int(i) for i in self.croploc]
         self.width = self.croploc[2] - self.croploc[0]
         self.height = self.croploc[3] - self.croploc[1]
+        self.x_start = self.croploc[0]
+        self.y_start = self.croploc[1]
 
     def load_mask(self, datadir):
         self.maskpath = datadir
         self.maskcrop = cv2.imread(self.maskpath, cv2.IMREAD_GRAYSCALE)
-        self.full_mask = np.zeros((480,640), dtype=np.uint8)
-        self.x_start = self.croploc[0]
-        self.y_start = self.croploc[1]
-        for x in xrange(self.width):
-            for y in xrange(self.height):
-                self.full_mask[self.y_start + y, self.x_start + x] = \
-                        self.maskcrop[y, x]
+#        self.full_mask = np.zeros((480,640), dtype=np.uint8)
+#        for x in xrange(self.width):
+#            for y in xrange(self.height):
+#                self.full_mask[self.y_start + y, self.x_start + x] = \
+#                        self.maskcrop[y, x]
 
 
 def get_mask(datadir):
     """
     go through crop location and mask files
     """
+    if verbose:
+        print('going through locations ...')
     for root, dirs, files in os.walk(datadir):
         for name in files:
             filepath = os.path.join(root, name)
@@ -60,6 +64,8 @@ def get_mask(datadir):
                 obj_mask.load_location()
                 masks[obj_mask.frame_name] = obj_mask
 
+    if verbose:
+        print('going through masks ...')
     for root, dirs, files in os.walk(datadir):
         for name in files:
             filepath = os.path.join(root, name)
@@ -71,25 +77,54 @@ def get_mask(datadir):
                         + split_filepath[-2]
                 masks[frame_name].load_mask(filepath)
 
-def output_data(obj_datadir, bg_datadir, output_dir):
+def get_background(bg_datadir):
     """
-    go through rgb images and substitute background
+    output a dictionary containing background images
     """
-    mask_datadir = obj_datadir + '/crop'
-    rgb_datadir = obj_datadir + '/full_rgb'
-    get_mask(mask_datadir)
+    backgrounds = {}
+    # {'deg' : 'cv2.image'}
 
-    bg_30 = []; bg_45 = []; bg_60 = []
+    if verbose:
+        print('getting backgrounds ...')
     for root, dirs, files in os.walk(bg_datadir):
         for name in files:
             filepath = os.path.join(root, name)
             if filepath.endswith('30.png'):
-                bg_30 = cv2.imread(filepath)
+                backgrounds['30deg'] = cv2.imread(filepath)
             elif filepath.endswith('45.png'):
-                bg_45 = cv2.imread(filepath)
+                backgrounds['45deg'] = cv2.imread(filepath)
             elif filepath.endswith('60.png'):
-                bg_60 = cv2.imread(filepath)
+                backgrounds['60deg'] = cv2.imread(filepath)
+    return backgrounds
 
+def substitute_background(obj_mask, full_img, output_img):
+
+    x_start = obj_mask.x_start
+    y_start = obj_mask.y_start
+
+    width = obj_mask.width
+    height = obj_mask.height
+
+    maskcrop = obj_mask.maskcrop
+
+    for x in xrange(width):
+        for y in xrange(height):
+            if maskcrop[y][x] != 0:
+                output_img[y_start+y][x_start+x] = \
+                        full_img[y_start+y][x_start+x]
+
+def output_data(obj_datadir, bg_datadir, output_dir):
+    """
+    go through rgb images and substitute background
+    """
+    mask_datadir = obj_datadir + '/ADL_mask'
+    rgb_datadir = obj_datadir + '/ADL_rgb'
+    get_mask(mask_datadir)
+
+    backgrounds = get_background(bg_datadir)
+
+    if verbose:
+        print('going through rgb and outputing rgb ...')
     for root, dirs, files in os.walk(rgb_datadir):
         for name in files:
             filepath = os.path.join(root, name)
@@ -106,37 +141,31 @@ def output_data(obj_datadir, bg_datadir, output_dir):
                 obj_mask = masks[frame_name]
                 angle_type = int(split_filepath[-3])
 
-                x_start = obj_mask.x_start; y_start = obj_mask.y_start
-                width = obj_mask.width; height = obj_mask.height
-                maskcrop = obj_mask.maskcrop
 
                 if angle_type == 1:
-                    output_img = bg_30.copy()
+                    output_img = backgrounds['30deg'].copy()
                     angletxt = '30deg'
                 elif angle_type == 2:
-                    output_img = bg_45.copy()
+                    output_img = backgrounds['45deg'].copy()
                     angletxt = '45deg'
                 elif angle_type == 3:
-                    output_img = bg_60.copy()
+                    output_img = backgrounds['60deg'].copy()
                     angletxt = '60deg'
 
-                for x in xrange(width):
-                    for y in xrange(height):
-                        if maskcrop[y][x] != 0:
-                            output_img[y_start+y][x_start+x] = \
-                                    full_img[y_start+y][x_start+x]
+                substitute_background(obj_mask, full_img, output_img)
+
                 output_filedir = output_dir + '/' + cat + '/' \
                         + instance + '/' + angletxt
                 if not os.path.exists(output_filedir):
                     os.makedirs(output_filedir)
                 output_filepath = output_filedir + '/' + frame_name \
                         + '_rgboriginal.png'
-                print(output_filepath)
+                cv2.imwrite(output_filepath, output_img)
 
 if __name__ == '__main__':
 
-    obj_datadir = '/home/wanlin/Pictures/sub_single'
-    bg_datadir = '/home/wanlin/Pictures/sub_single/background'
-    output_dir = '/home/wanlin/Pictures/sub_single'
+    obj_datadir = '/home/wanlin/Downloads'
+    bg_datadir = '/home/wanlin/Pictures/background'
+    output_dir = '/home/wanlin/Downloads/sub_single'
 
     output_data(obj_datadir, bg_datadir, output_dir)
