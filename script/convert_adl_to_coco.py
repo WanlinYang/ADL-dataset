@@ -61,6 +61,7 @@ id_list = [i for i in xrange(30000)]
 
 verbose = True
 test_data = False
+substitution = False
 
 class Annotation:
     def __init__(self, category_id, image_id):
@@ -173,10 +174,10 @@ def get_data(datadir):
                             + split_filepath[-3] + '_' \
                             + split_filepath[-2]
 
-                    # for substitution
-                    obj_mask = Object_mask(filepath)
-                    obj_mask.load_location()
-                    masks[obj_mask.frame_name] = obj_mask
+                    if substitution:
+                        obj_mask = Object_mask(filepath)
+                        obj_mask.load_location()
+                        masks[obj_mask.frame_name] = obj_mask
 
                     croploc = [None]*4
                     with open(filepath) as f:
@@ -208,8 +209,8 @@ def get_data(datadir):
                 if frame_name not in image_annotations:
                     continue
 
-                # for substitution
-                masks[frame_name].load_mask(filepath)
+                if substitution:
+                    masks[frame_name].load_mask(filepath)
 
                 bbox = image_annotations[frame_name].bbox
                 maskcrop = cv2.imread(filepath, cv2.IMREAD_GRAYSCALE)
@@ -245,7 +246,8 @@ def save_data(bg_datadir, datadir, outputdir):
     if test_data:
         rgbdest_path = outputdir + '/ADL_test'
 
-    backgrounds = get_background(bg_datadir)
+    if substitution:
+        backgrounds = get_background(bg_datadir)
 
     if not os.path.exists(rgbdest_path):
         os.makedirs(rgbdest_path)
@@ -269,22 +271,25 @@ def save_data(bg_datadir, datadir, outputdir):
                 destfilepath = rgbdest_path + '/' + destfilename
                 num_frame = int(split_filepath[-2])
 
-                if num_frame % 2 != 0:
-                    # substitution
-                    full_img = cv2.imread(filepath)
-                    obj_mask = masks[frame_name]
-                    angle_type = int(split_filepath[-3])
-                    if angle_type == 1:
-                        output_img = backgrounds['30deg'].copy()
-                    elif angle_type == 2:
-                        output_img = backgrounds['45deg'].copy()
-                    elif angle_type == 3:
-                        output_img = backgrounds['60deg'].copy()
-                    substitute_background(obj_mask, full_img, output_img)
-                    cv2.imwrite(destfilepath, output_img)
-                    continue
+                if substitution:
+                    if num_frame % 2 != 0:
+                        # substitution
+                        full_img = cv2.imread(filepath)
+                        obj_mask = masks[frame_name]
+                        angle_type = int(split_filepath[-3])
+                        if angle_type == 1:
+                            output_img = backgrounds['30deg'].copy()
+                        elif angle_type == 2:
+                            output_img = backgrounds['45deg'].copy()
+                        elif angle_type == 3:
+                            output_img = backgrounds['60deg'].copy()
+                        substitute_background(obj_mask, full_img, output_img)
+                        cv2.imwrite(destfilepath, output_img)
+                        continue
+                    else:
+                        # no substitution
+                        copyfile(filepath, destfilepath)
                 else:
-                    # no substitution
                     copyfile(filepath, destfilepath)
 
     if verbose:
@@ -335,6 +340,7 @@ if __name__ == '__main__':
 
     outputdir = '/home/wanlin/Downloads/ADL2018'
 
+    substitution = False
     test_data = True
     if test_data:
         prone_test_id_list(outputdir)
