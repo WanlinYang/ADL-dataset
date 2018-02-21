@@ -43,14 +43,14 @@ class Evaluate_unit:
         self.IoU = float(pred_area) / float(Union)
 
 
-def load_data(datadir):
+def load_data(pred_datadir, gt_datadir):
     """
     load data from json file
     """
     global categories
 
-    pred_file_path = datadir + '/bbox_adl_2018_test_results.json'
-    gt_file_path = datadir + '/segmentation_test2018.json'
+    pred_file_path = pred_datadir + '/bbox_adl_2018_test_results.json'
+    gt_file_path = gt_datadir + '/segmentation_test2018.json'
 
     with open(pred_file_path, 'r') as f:
         pred_data = json.load(f)
@@ -60,12 +60,12 @@ def load_data(datadir):
     categories = gt_data['categories']
     return pred_data, gt_data
 
-def traverse_data(datadir):
+def traverse_data(pred_datadir, gt_datadir):
     """
     load all prediction and ground truth data
     """
     global evaluation
-    pred_data, gt_data = load_data(datadir)
+    pred_data, gt_data = load_data(pred_datadir, gt_datadir)
 
     for gt in gt_data['annotations']:
         image_id = gt['image_id']
@@ -79,8 +79,9 @@ def traverse_data(datadir):
         evaluation[image_id].calculate_IoU()
 
 if __name__ == '__main__':
-    datadir = '/home/wanlin/Downloads/ADL_CNN_2.20'
-    traverse_data(datadir)
+    pred_datadir = '/home/wanlin/Documents/substitution/test_original'
+    gt_datadir = '/home/wanlin/Documents/original/ADL2018/annotations'
+    traverse_data(pred_datadir, gt_datadir)
 
     for key, value in evaluation.iteritems():
         print(value.IoU)

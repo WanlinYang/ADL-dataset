@@ -164,9 +164,9 @@ def get_data(datadir):
                 num_frame = int(split_filepath[-2])
                 cat = split_filepath[-5]
 
-                if ((not test_data) and (num_frame % 15 == 0) and \
+                if ((not test_data) and (num_frame % 5 == 0) and \
                     (cat in category_ids)) or \
-                   ((test_data) and ((num_frame+10) % 97 == 0) and \
+                   ((test_data) and ((num_frame+10) % 31 == 0) and \
                     (cat in category_ids)):
 
                     frame_name = split_filepath[-5] + '_' \
@@ -340,7 +340,7 @@ if __name__ == '__main__':
 
     outputdir = '/home/wanlin/Downloads/ADL2018'
 
-    substitution = False
+    substitution = True
     test_data = True
     if test_data:
         prone_test_id_list(outputdir)
