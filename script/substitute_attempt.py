@@ -26,18 +26,19 @@ CAPACITY = 12
 # object capacity of one background image
 
 class Object:
-    def __init__(self, annotation, rgbdatadir, maskdatadir):
+    def __init__(self, annotation, rgbdatadir):
         self.image_id = annotation['image_id']
         self.area = annotation['area']
         self.bbox = annotation['bbox']
         self.category_id = annotation['category_id']
-        self.polygon = None
-        self.rgb_path = rgbdatadir # rgb image path
-        self.mask_path = maskdatadir # mask image path
+        self.polygon = annotation['segmentation']
+        self.rgbdatadir = rgbdatadir # image folder path
+        self.file_path = self.rgbdatadir + '/' + \
+                        image_names[self.image_id]
 
     def load_data(self):
-        """ load cropped rgb data and cropped mask data """
-        full_img = cv2.imread(self.rgb_path)
+        """ load full rgb data given rgb image folder path """
+        self.full_img = cv2.imread(self.file_path)
 
         ul_x = self.bbox[0]; ul_y = self.bbox[1]
         lr_x = ul_x + self.bbox[2]
@@ -46,7 +47,14 @@ class Object:
         self.crop_loc = [ul_x, ul_y, lr_x, lr_y]
         self.cropped_img = self.full_img[ul_y:lr_y,ul_x:lr_x]
 
-        self.cropped_mask = cv2.imread(self.mask_path, cv2.IMREAD_GRAYSCALE)
+    def process_mask(self):
+        """ process polygon and bbox for cropped mask """
+        Rs = mask_util.frPyObjects(self.polygon, 480, 640)
+        mask = mask_util.decode(Rs)
+        [ul_x, ul_y, lr_x, lr_y] = self.crop_loc
+
+        self.full_mask = np.reshape(mask, (480, 640))
+        self.cropped_mask = mask[ul_y:lr_y,ul_x:lr_x]
 
 class Background:
     def __init__(self, annotation, bgdatadir):
@@ -63,13 +71,46 @@ class Background:
             d = pickle.load(f)
         self.mask = d['mask']
 
-def get_obj_annotations(mask_datadir):
+def find_polygon(maskcrop, bbox):
     """
-    traverse loc and mask, return a list of dict
+    return coco-compatible convex polygon for a 480x640 image,
+    given cropped mask and bbox
     """
-    obj_annotations = []
+    full_mask = np.zeros((480, 640), dtype=np.uint8)
+    [x, y, width, height] = bbox
 
-    return obj_annotations
+    for i in xrange(height):
+        for j in xrange(width):
+            full_mask[y+i][x+j] = maskcrop[i][j]
+
+    im2, contours, hierarchy = cv2.findContours(full_mask, cv2.RETR_TREE,
+                                               cv2.CHAIN_APPROX_SIMPLE)
+    cont = contours[0]
+    for i in xrange(1, len(contours)):
+        cont = np.concatenate((cont, contours[i]), axis=0)
+
+    hull = cv2.convexHull(cont)
+    polygon = []
+
+    for p in hull:
+        [x,y] = p[0]
+        x = float(x); y = float(y)
+        polygon.append(x)
+        polygon.append(y)
+
+    return [polygon]
+
+def show_mask(polygon):
+    """
+    show convex mask given polygon
+    """
+    Rs = mask_util.frPyObjects(polygon, 480, 640)
+    mask = mask_util.decode(Rs)
+    mask = np.reshape(mask, (480, 640))
+
+    ret, thresh = cv2.threshold(mask, 0.5, 255, cv2.THRESH_BINARY)
+    cv2.imshow('mask', thresh)
+    cv2.waitKey(0)
 
 def put_objects(obj_list, bg):
     """
@@ -140,8 +181,12 @@ def put_objects(obj_list, bg):
             annot_dict = {}
             annot_dict['bbox'] = [x, y, cols, rows]
             annot_dict['category_id'] = obj.category_id
-            annot_dict['segmentation'] = None
-            annot_dict['area'] = None
+            polygon = find_polygon(obj_scaled_mask,
+                                                     annot_dict['bbox'])
+            annot_dict['segmentation'] = polygon
+            Rs = mask_util.frPyObjects(polygon, 480, 640)
+            area = mask_util.area(Rs)[0]
+            annot_dict['area'] = float(area)
             annotations.append(annot_dict)
 
     return bg_img, annotations
@@ -160,13 +205,13 @@ def load_image_names(data_image_list):
         file_name = data_image['file_name']
         image_names[image_id] = file_name
 
-def output_data(rgb_datadir, mask_datadir, bg_datadir, output_dir, total):
+def output_data(obj_datadir, bg_datadir, output_dir, total):
     """
     put random number of objects into random background,
     and output total merged images and json file
     """
-    obj_img_folder = rgb_datadir
-    mask_img_folder = mask_datadir
+    obj_json_file = obj_datadir + '/annotations/segmentation_train2018.json'
+    obj_img_folder = obj_datadir + '/ADL_train'
     bg_img_folder = bg_datadir
 
     output_img_dir = output_dir + '/ADL_train'
@@ -191,10 +236,12 @@ def output_data(rgb_datadir, mask_datadir, bg_datadir, output_dir, total):
                 bg_annotations.append(d)
 
     if verbose:
-        print('getting annotations ...')
+        print('loading object json ...')
 
-    obj_annotations = get_obj_annotations(mask_datadir)
-    # traverse loc and mask, save as a list of dict
+    with open(obj_json_file, 'r') as f:
+        obj_json_data = json.load(f)
+    load_image_names(obj_json_data['images'])
+    obj_annotations = obj_json_data['annotations']
 
     def prone_test_id_cands(output_dir):
         """ assume already has training data """
@@ -209,7 +256,7 @@ def output_data(rgb_datadir, mask_datadir, bg_datadir, output_dir, total):
             image_id_cands.remove(train_id)
         return num_imgs
 
-    image_id_cands = [i for i in xrange(10000)]
+    image_id_cands = [i for i in xrange(7000)]
     start_id = 0
     if test_data:
         start_id = prone_test_id_cands(output_dir)
@@ -236,6 +283,7 @@ def output_data(rgb_datadir, mask_datadir, bg_datadir, output_dir, total):
             obj_annotation = random.choice(obj_annotations)
             obj = Object(obj_annotation, obj_img_folder)
             obj.load_data()
+            obj.process_mask()
             obj_list.append(obj)
 
         img, annotations = put_objects(obj_list, bg)

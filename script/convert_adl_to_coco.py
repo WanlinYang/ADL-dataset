@@ -1,3 +1,4 @@
+
 from __future__ import print_function
 from __future__ import unicode_literals
 
@@ -15,38 +16,42 @@ from shutil import copyfile
 import json
 
 categories = [
-    {'id': 1, 'name': 'cracker-box', 'supercategory': 'food-preparation'},
-    {'id': 2, 'name': 'can', 'supercategory': 'food-preparation'},
-    {'id': 3, 'name': 'bowl', 'supercategory': 'food-preparation'},
-    {'id': 4, 'name': 'plate', 'supercategory': 'food-preparation'},
-    {'id': 5, 'name': 'cup', 'supercategory': 'food-preparation'},
-    {'id': 6, 'name': 'plastic-tumbler', 'supercategory': 'food-preparation'},
-    {'id': 7, 'name': 'knife', 'supercategory': 'food-preparation'},
-    {'id': 8, 'name': 'spoon', 'supercategory': 'food-preparation'},
-    {'id': 9, 'name': 'fork', 'supercategory': 'food-preparation'},
-    {'id':10, 'name': 'medicine-bottle', 'supercategory': 'food-preparation'},
-    {'id':11, 'name': 'towel', 'supercategory': 'housekeeping'},
-    {'id':12, 'name': 'dish-scouring-pad', 'supercategory': 'housekeeping'},
-    {'id':13, 'name': 'flashlight', 'supercategory': 'housekeeping'},
-    {'id':14, 'name': 'screwdriver', 'supercategory': 'housekeeping'},
-    {'id':15, 'name': 'hammer', 'supercategory': 'housekeeping'},
-    {'id':16, 'name': 'wrench', 'supercategory': 'housekeeping'},
-    {'id':17, 'name': 'toothbrush', 'supercategory': 'hygiene'},
-    {'id':18, 'name': 'toothpaste', 'supercategory': 'hygiene'},
-    {'id':19, 'name': 'soap', 'supercategory': 'hygiene'},
-    {'id':20, 'name': 'handsoap', 'supercategory': 'hygiene'},
-    {'id':21, 'name': 'wallet', 'supercategory': 'hygiene'},
-    {'id':22, 'name': 'hairbrush', 'supercategory': 'hygiene'},
-    {'id':23, 'name': 'book', 'supercategory': 'office-tasks'},
-    {'id':24, 'name': 'pen', 'supercategory': 'office-tasks'},
-    {'id':25, 'name': 'tape', 'supercategory': 'office-tasks'},
-    {'id':26, 'name': 'stapler', 'supercategory': 'office-tasks'},
-    {'id':27, 'name': 'headphone', 'supercategory': 'office-tasks'},
-    {'id':28, 'name': 'mouse', 'supercategory': 'office-tasks'}
+    {'id': 1, 'name': 'cracker-box', 'supercategory': 'box','superid': 1},
+    {'id': 2, 'name': 'can', 'supercategory': 'container','superid': 2},
+    {'id': 3, 'name': 'bowl', 'supercategory': 'container','superid': 2},
+    {'id': 4, 'name': 'plate', 'supercategory': 'container','superid': 2},
+    {'id': 5, 'name': 'cup', 'supercategory': 'container','superid': 2},
+    {'id': 6, 'name': 'plastic-tumbler', 'supercategory': 'container','superid': 2},
+    {'id': 7, 'name': 'knife', 'supercategory': 'food-utensil','superid': 3},
+    {'id': 8, 'name': 'spoon', 'supercategory': 'food-utensil','superid': 3},
+    {'id': 9, 'name': 'fork', 'supercategory': 'food-utensil','superid': 3},
+    #{'id':10, 'name': 'medicine-bottle', 'supercategory': 'medicine','superid': 2},
+    {'id':11, 'name': 'towel', 'supercategory': 'scrub','superid': 4},
+    {'id':12, 'name': 'dish-scouring-pad', 'supercategory': 'scrub','superid': 4},
+    {'id':13, 'name': 'flashlight', 'supercategory': 'device','superid': 5},
+    {'id':14, 'name': 'screwdriver', 'supercategory': 'tool','superid': 6},
+    {'id':15, 'name': 'hammer', 'supercategory': 'tool','superid': 6},
+    {'id':16, 'name': 'wrench', 'supercategory': 'tool','superid': 6},
+    {'id':17, 'name': 'toothbrush', 'supercategory': 'hygiene-teeth','superid': 7},
+    {'id':18, 'name': 'toothpaste', 'supercategory': 'hygiene-teeth','superid': 7},
+    {'id':19, 'name': 'soap', 'supercategory': 'hygiene-body','superid': 8},
+    {'id':20, 'name': 'handsoap', 'supercategory': 'hygiene-body','superid': 8},
+    {'id':21, 'name': 'wallet', 'supercategory': 'dressing','superid': 9},
+    {'id':22, 'name': 'hairbrush', 'supercategory': 'grooming','superid': 10},
+    {'id':23, 'name': 'book', 'supercategory': 'printed-matter','superid': 11},
+    {'id':24, 'name': 'pen', 'supercategory': 'writing','superid': 12},
+    {'id':25, 'name': 'tape', 'supercategory': 'office-tool','superid': 13},
+    {'id':26, 'name': 'stapler', 'supercategory': 'office-tool','superid': 13},
+    {'id':27, 'name': 'headphone', 'supercategory': 'digital-device','superid': 14},
+    {'id':28, 'name': 'mouse', 'supercategory': 'digital-device','superid': 14}
 ]
+
 # keys: id, name, supercategory
 category_ids = {}
 # {'category': id}
+
+supercategory_ids = {}
+# {'category': {'superid': superid, 'supercategory': supercategory}}
 
 image_ids = {}
 # {'ADL_file_name': 'image_id'}
@@ -94,6 +99,15 @@ def get_category_id():
         cat_name = cat['name']
         cat_id = cat['id']
         category_ids[cat_name] = cat_id
+
+    global supercategory_ids
+    for cat in categories:
+        cat_name = cat['name']
+        supercat_name = cat['supercategory']
+        supercat_id = cat['superid']
+        supercategory_ids[cat_name] = {}
+        supercategory_ids[cat_name]['superid'] = supercat_id
+        supercategory_ids[cat_name]['supercategory'] = supercat_name
 
 def croploc_to_bbox(croploc):
     """
@@ -164,9 +178,9 @@ def get_data(datadir):
                 num_frame = int(split_filepath[-2])
                 cat = split_filepath[-5]
 
-                if ((not test_data) and (num_frame % 5 == 0) and \
+                if ((not test_data) and (num_frame % 15 == 0) and \
                     (cat in category_ids)) or \
-                   ((test_data) and ((num_frame+10) % 31 == 0) and \
+                   ((test_data) and ((num_frame+10) % 97 == 0) and \
                     (cat in category_ids)):
 
                     frame_name = split_filepath[-5] + '_' \
@@ -190,7 +204,7 @@ def get_data(datadir):
                     id_list.remove(img_id)
                     image_ids[frame_name] = img_id
                     image_annotations[frame_name] = \
-                            Annotation(category_ids[cat], img_id)
+                            Annotation(supercategory_ids[cat]['superid'], img_id)
                     image_annotations[frame_name].bbox = \
                             croploc_to_bbox(croploc)
 
