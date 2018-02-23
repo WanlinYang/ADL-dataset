@@ -46,6 +46,23 @@ categories = [
     {'id':28, 'name': 'mouse', 'supercategory': 'digital-device','superid': 14}
 ]
 
+supercategories = [
+    {'id': 1, 'name': 'box', 'supercategory': 'food-preparation'},
+    {'id': 2, 'name': 'container', 'supercategory': 'food-preparation'},
+    {'id': 3, 'name': 'food-utensil', 'supercategory': 'food-preparation'},
+    {'id': 4, 'name': 'scrub', 'supercategory': 'housekeeping'},
+    {'id': 5, 'name': 'device', 'supercategory': 'housekeeping'},
+    {'id': 6, 'name': 'tool', 'supercategory': 'housekeeping'},
+    {'id': 7, 'name': 'hygiene-teeth', 'supercategory': 'hygiene'},
+    {'id': 8, 'name': 'hygiene-body', 'supercategory': 'hygiene'},
+    {'id': 9, 'name': 'dressing', 'supercategory': 'hygiene'},
+    {'id': 10,'name': 'grooming', 'supercategory': 'hygiene'},
+    {'id': 11,'name': 'printed-matter', 'supercategory': 'office-tasks'},
+    {'id': 12,'name': 'writing', 'supercategory': 'office-tasks'},
+    {'id': 13,'name': 'office-tool', 'supercategory': 'office-tasks'},
+    {'id': 14,'name': 'digital-device', 'supercategory': 'office-tasks'}
+]
+
 # keys: id, name, supercategory
 category_ids = {}
 # {'category': id}
@@ -310,7 +327,7 @@ def save_data(bg_datadir, datadir, outputdir):
         print('saving json file ...')
 
     data = {}
-    data['categories'] = categories
+    data['categories'] = supercategories
     data['images'] = []
     data['annotations'] = []
     for key, value in image_annotations.iteritems():

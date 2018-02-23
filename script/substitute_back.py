@@ -3,12 +3,43 @@ from __future__ import unicode_literals
 
 import numpy as np
 import matplotlib.pyplot as plt
-import pycocotools.mask as mask_util
 import cv2
 import os
+import re
 import random
 import json
 import pickle
+
+categories = [
+    {'id': 1, 'name': 'cracker-box', 'supercategory': 'box'},
+    {'id': 2, 'name': 'can', 'supercategory': 'container'},
+    {'id': 3, 'name': 'bowl', 'supercategory': 'container'},
+    {'id': 4, 'name': 'plate', 'supercategory': 'container'},
+    {'id': 5, 'name': 'cup', 'supercategory': 'container'},
+    {'id': 6, 'name': 'plastic-tumbler', 'supercategory': 'container'},
+    {'id': 7, 'name': 'knife', 'supercategory': 'food-utensil'},
+    {'id': 8, 'name': 'spoon', 'supercategory': 'food-utensil'},
+    {'id': 9, 'name': 'fork', 'supercategory': 'food-utensil'},
+    {'id':10, 'name': 'medicine-bottle', 'supercategory': 'medicine'},
+    {'id':11, 'name': 'towel', 'supercategory': 'scrub'},
+    {'id':12, 'name': 'dish-scouring-pad', 'supercategory': 'scrub'},
+    {'id':13, 'name': 'flashlight', 'supercategory': 'device'},
+    {'id':14, 'name': 'screwdriver', 'supercategory': 'tool'},
+    {'id':15, 'name': 'hammer', 'supercategory': 'tool'},
+    {'id':16, 'name': 'wrench', 'supercategory': 'tool'},
+    {'id':17, 'name': 'toothbrush', 'supercategory': 'hygiene-teeth'},
+    {'id':18, 'name': 'toothpaste', 'supercategory': 'hygiene-teeth'},
+    {'id':19, 'name': 'soap', 'supercategory': 'hygiene-body'},
+    {'id':20, 'name': 'handsoap', 'supercategory': 'hygiene-body'},
+    {'id':21, 'name': 'wallet', 'supercategory': 'dressing'},
+    {'id':22, 'name': 'hairbrush', 'supercategory': 'grooming'},
+    {'id':23, 'name': 'book', 'supercategory': 'printed-matter'},
+    {'id':24, 'name': 'pen', 'supercategory': 'writing'},
+    {'id':25, 'name': 'tape', 'supercategory': 'office-tool'},
+    {'id':26, 'name': 'stapler', 'supercategory': 'office-tool'},
+    {'id':27, 'name': 'headphone', 'supercategory': 'digital-device'},
+    {'id':28, 'name': 'mouse', 'supercategory': 'digital-device'}
+]
 
 """
 This is the attempt of putting several objects that masked
@@ -16,8 +47,11 @@ out from the original dataset over several pre-labeled
 candidate background
 output: 480x640 image and COCO-format json file
 """
-image_names = {}
-# {'image_id': 'image_file_name'}
+object_dict = {}
+# {'frame_name': 'Object'}
+
+category_ids = {}
+# {'category', 'id'}
 
 test_data = False
 verbose = True
@@ -26,27 +60,47 @@ CAPACITY = 12
 # object capacity of one background image
 
 class Object:
-    def __init__(self, annotation, rgbdatadir, maskdatadir):
-        self.image_id = annotation['image_id']
-        self.area = annotation['area']
-        self.bbox = annotation['bbox']
-        self.category_id = annotation['category_id']
-        self.polygon = None
-        self.rgb_path = rgbdatadir # rgb image path
-        self.mask_path = maskdatadir # mask image path
+    def __init__(self, datadir):
+        self.locpath = datadir
+        self.croploc = [None]*4
+        self.split_locpath = re.split('_|/', self.locpath)
+        self.frame_name = get_frame_name(self.locpath)
+        self.category = self.split_locpath[-5]
+        self.category_id = category_ids[self.category]
+        self.bbox = self.croploc_to_bbox()
+
+    def croploc_to_bbox(self):
+        with open(self.locpath) as f:
+            loc = f.readlines()
+            self.croploc[0:2] = re.split(',|\n', loc[0])[0:2]
+            self.croploc[2:4] = re.split(',|\n', loc[1])[0:2]
+            self.croploc = [int(i) for i in self.croploc]
+
+        [x1, y1, x2, y2] = self.croploc
+        width = x2 - x1
+        height = y2 - y1
+        x = x1
+        y = y1
+        return [x, y, width, height]
+
+    def get_maskpath(self, maskpath):
+        self.maskpath = maskpath
+
+    def get_rgbpath(self, rgbpath):
+        self.rgbpath = rgbpath
 
     def load_data(self):
         """ load cropped rgb data and cropped mask data """
-        full_img = cv2.imread(self.rgb_path)
+        full_img = cv2.imread(self.rgbpath)
 
         ul_x = self.bbox[0]; ul_y = self.bbox[1]
         lr_x = ul_x + self.bbox[2]
         lr_y = ul_y + self.bbox[3]
 
         self.crop_loc = [ul_x, ul_y, lr_x, lr_y]
-        self.cropped_img = self.full_img[ul_y:lr_y,ul_x:lr_x]
+        self.cropped_img = full_img[ul_y:lr_y,ul_x:lr_x]
 
-        self.cropped_mask = cv2.imread(self.mask_path, cv2.IMREAD_GRAYSCALE)
+        self.cropped_mask = cv2.imread(self.maskpath, cv2.IMREAD_GRAYSCALE)
 
 class Background:
     def __init__(self, annotation, bgdatadir):
@@ -63,13 +117,60 @@ class Background:
             d = pickle.load(f)
         self.mask = d['mask']
 
-def get_obj_annotations(mask_datadir):
+def get_frame_name(filepath):
+    split_filepath = re.split('_|/', filepath)
+    frame_name = split_filepath[-5] + '_' \
+            + split_filepath[-4] + '_' \
+            + split_filepath[-3] + '_' \
+            + split_filepath[-2]
+    return frame_name
+
+def get_category_id():
+    global category_ids
+    for cat in categories:
+        cat_name = cat['name']
+        cat_id = cat['id']
+        category_ids[cat_name] = cat_id
+
+def traverse_datapath(rgb_datadir, mask_datadir):
     """
     traverse loc and mask, return a list of dict
     """
-    obj_annotations = []
+    global object_dict
 
-    return obj_annotations
+    if verbose:
+        print('going through locations ...')
+    for root, dirs, files in os.walk(mask_datadir):
+        for name in files:
+            filepath = os.path.join(root, name)
+            if filepath.endswith('loc.txt'):
+                split_filepath = re.split('_|/', filepath)
+                cat = split_filepath[-5]
+
+                if cat in category_ids:
+                    frame_name = get_frame_name(filepath)
+                    obj = Object(filepath)
+                    object_dict[frame_name] = obj
+
+    if verbose:
+        print('going through masks ...')
+    for root, dirs, files in os.walk(mask_datadir):
+        for name in files:
+            filepath = os.path.join(root, name)
+            if filepath.endswith('maskcrop.png'):
+                frame_name = get_frame_name(filepath)
+                if frame_name in object_dict:
+                    object_dict[frame_name].get_maskpath(filepath)
+
+    if verbose:
+        print('going through rgbs ...')
+    for root, dirs, files in os.walk(rgb_datadir):
+        for name in files:
+            filepath = os.path.join(root, name)
+            if filepath.endswith('rgboriginal.png'):
+                frame_name = get_frame_name(filepath)
+                if frame_name in object_dict:
+                    object_dict[frame_name].get_rgbpath(filepath)
 
 def put_objects(obj_list, bg):
     """
@@ -134,7 +235,7 @@ def put_objects(obj_list, bg):
             rows, cols, channel = obj_scaled_img.shape
             for i in xrange(rows):
                 for j in xrange(cols):
-                    if obj_scaled_mask[i][j] == 1:
+                    if obj_scaled_mask[i][j] != 0:
                         bg_img[y+i][x+j] = obj_scaled_img[i][j]
 
             annot_dict = {}
@@ -147,27 +248,11 @@ def put_objects(obj_list, bg):
     return bg_img, annotations
 
 
-def load_image_names(data_image_list):
-    """
-    data_image is a dictionary, containing image_id and
-    corresponding file name.
-    It is included in json file.
-    """
-    global image_names
-
-    for data_image in data_image_list:
-        image_id = data_image['id']
-        file_name = data_image['file_name']
-        image_names[image_id] = file_name
-
 def output_data(rgb_datadir, mask_datadir, bg_datadir, output_dir, total):
     """
     put random number of objects into random background,
     and output total merged images and json file
     """
-    obj_img_folder = rgb_datadir
-    mask_img_folder = mask_datadir
-    bg_img_folder = bg_datadir
 
     output_img_dir = output_dir + '/ADL_train'
     if test_data:
@@ -182,7 +267,7 @@ def output_data(rgb_datadir, mask_datadir, bg_datadir, output_dir, total):
         print('loading background pickle ...')
 
     bg_annotations = []
-    for root, dirs, files in os.walk(bg_img_folder):
+    for root, dirs, files in os.walk(bg_datadir):
         for name in files:
             filepath = os.path.join(root, name)
             if filepath.endswith('.pkl'):
@@ -190,11 +275,8 @@ def output_data(rgb_datadir, mask_datadir, bg_datadir, output_dir, total):
                     d = pickle.load(f)
                 bg_annotations.append(d)
 
-    if verbose:
-        print('getting annotations ...')
-
-    obj_annotations = get_obj_annotations(mask_datadir)
-    # traverse loc and mask, save as a list of dict
+    traverse_datapath(rgb_datadir, mask_datadir)
+    # traverse loc, mask and rgb, and save path into object_dict
 
     def prone_test_id_cands(output_dir):
         """ assume already has training data """
@@ -216,7 +298,7 @@ def output_data(rgb_datadir, mask_datadir, bg_datadir, output_dir, total):
     data = {}
     data['images'] = []
     data['annotations'] = []
-    data['categories'] = obj_json_data['categories']
+    data['categories'] = categories
 
     if verbose:
         print('producing and saving cluster images ...')
@@ -227,14 +309,14 @@ def output_data(rgb_datadir, mask_datadir, bg_datadir, output_dir, total):
         image_name = 'ADL2018_cluster_' + str(total_i) + '.png'
 
         bg_annotation = random.choice(bg_annotations)
-        bg = Background(bg_annotation, bg_img_folder)
+        bg = Background(bg_annotation, bg_datadir)
         bg.load_data()
 
         num_objs = random.randint(3, CAPACITY)
         obj_list = []
         for obj_i in xrange(num_objs):
-            obj_annotation = random.choice(obj_annotations)
-            obj = Object(obj_annotation, obj_img_folder)
+            obj_frame = random.choice(object_dict.keys())
+            obj = object_dict[obj_frame]
             obj.load_data()
             obj_list.append(obj)
 
@@ -270,15 +352,15 @@ def output_data(rgb_datadir, mask_datadir, bg_datadir, output_dir, total):
 
 
 if __name__ == '__main__':
+    get_category_id()
 
-    obj_datadir = '/home/wanlin/Downloads/ADL2018'
+    rgb_datadir = '/home/wanlin/Downloads/ADL_rgb'
+    mask_datadir = '/home/wanlin/Downloads/ADL_mask'
     bg_datadir = '/home/wanlin/Downloads/ADL_cluster/scene'
+
     output_dir = '/home/wanlin/Downloads/ADL_cluster'
 
-    test_data = True
-    data = output_data(obj_datadir, bg_datadir, output_dir, 1000)
-
-#    from IPython import embed
-#    embed()
+    test_data = False
+    data = output_data(rgb_datadir, mask_datadir, bg_datadir, output_dir, 10)
 
 
