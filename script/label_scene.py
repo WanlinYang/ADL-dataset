@@ -138,7 +138,7 @@ def label_img(datadir, scale_range):
             break
 
 if __name__ == '__main__':
-    datadir = '/home/wanlin/Downloads/ADL_cluster/scene/60.JPG'
+    datadir = '/home/wanlin/Downloads/ADL_cluster/scene/scene4.jpg'
     label_img(datadir, [0.8, 1.2])
 
 #    from IPython import embed
