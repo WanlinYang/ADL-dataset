@@ -24,7 +24,7 @@ categories = [
     {'id': 6, 'name': 'plastic-tumbler', 'supercategory': 'container','superid': 2},
     {'id': 7, 'name': 'knife', 'supercategory': 'food-utensil','superid': 3},
     {'id': 8, 'name': 'spoon', 'supercategory': 'food-utensil','superid': 3},
-    {'id': 9, 'name': 'fork', 'supercategory': 'food-utensil','superid': 3},
+    {'id': 9, 'name': 'fork', 'supercategory': 'food-utensil','superid': 3}
     #{'id':10, 'name': 'medicine-bottle', 'supercategory': 'medicine','superid': 2},
     {'id':10, 'name': 'towel', 'supercategory': 'scrub','superid': 4},
     {'id':11, 'name': 'dish-scouring-pad', 'supercategory': 'scrub','superid': 4},
@@ -178,27 +178,6 @@ def show_mask(polygon):
     cv2.imshow('mask', thresh)
     cv2.waitKey(0)
 
-def brightness(img, value):
-    """
-    change brightness of image
-    """
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    h, s, v = cv2.split(hsv)
-
-    if value >= 0:
-        lim = 255 - value
-        v[v > lim] = 255
-        v[v <= lim] += value
-    elif value < 0:
-        lim = 0 - value
-        v[v <= lim] = 0
-        v[v > lim] += np.uint8(value)
-
-    final_hsv = cv2.merge((h, s, v))
-    final_img = cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
-
-    return final_img
-
 def get_data(datadir):
     """
     go through crop location and mask files
@@ -216,9 +195,9 @@ def get_data(datadir):
                 num_frame = int(split_filepath[-2])
                 cat = split_filepath[-5]
 
-                if ((not test_data) and (num_frame % 15 == 0) and \
+                if ((not test_data) and (num_frame % 5 == 0) and \
                     (cat in category_ids)) or \
-                   ((test_data) and ((num_frame+10) % 97 == 0) and \
+                   ((test_data) and ((num_frame+10) % 37 == 0) and \
                     (cat in category_ids)):
 
                     frame_name = split_filepath[-5] + '_' \
@@ -336,16 +315,11 @@ def save_data(bg_datadir, datadir, outputdir):
                         elif angle_type == 3:
                             output_img = backgrounds['60deg'].copy()
                         substitute_background(obj_mask, full_img, output_img)
-                        brt = random.randint(-50,50)
-                        brt_img = brightness(output_img, brt)
-                        cv2.imwrite(destfilepath, brt_img)
+                        cv2.imwrite(destfilepath, output_img)
                         continue
                     else:
                         # no substitution
-                        output_img = cv2.imread(filepath)
-                        brt = random.randint(-50,50)
-                        brt_img = brightness(output_img, brt)
-                        cv2.imwrite(destfilepath, brt_img)
+                        copyfile(filepath, destfilepath)
                 else:
                     copyfile(filepath, destfilepath)
 
